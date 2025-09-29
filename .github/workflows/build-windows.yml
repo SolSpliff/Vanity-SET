@@ -14,13 +14,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          path: vanity
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
-      - name: Install dependencies (if present)
+      - name: Install dependencies
         shell: bash
         run: |
           python -m pip install --upgrade pip setuptools wheel
@@ -39,7 +41,7 @@ jobs:
       - name: Build executable with PyInstaller
         shell: bash
         run: |
-          cd "$GITHUB_WORKSPACE"
+          cd "$GITHUB_WORKSPACE/vanity"
           echo "Building from: $(pwd)"
           ls -la
 
