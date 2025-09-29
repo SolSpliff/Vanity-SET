@@ -1,103 +1,86 @@
-name: Build Vanity EXE (Windows)
+name: Build Vanity-S.E.T.
 
 on:
-  push:                       # runs on every push (any branch)
-  workflow_dispatch:          # allows manual runs from the Actions UI
+  push:
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Show workspace info (debug)
-        shell: pwsh
-        run: |
-          Write-Host "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
-          Write-Host "Current directory:"
-          pwd
-          Write-Host "Top-level files/dirs:"
-          Get-ChildItem -LiteralPath $env:GITHUB_WORKSPACE -Force | Sort-Object Name | Format-Table -AutoSize
+        uses: actions/checkout@v5
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Install dependencies (if present)
-        shell: pwsh
+        shell: bash
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          $req = Join-Path $env:GITHUB_WORKSPACE "dependency-installs\requirements.txt"
-          if (Test-Path $req) {
-            Write-Host "Installing from $req"
-            pip install -r $req
-          } else {
-            Write-Host "No dependency-installs/requirements.txt; installing common deps"
+          REQ="$GITHUB_WORKSPACE/dependency-installs/requirements.txt"
+          if [ -f "$REQ" ]; then
+            echo "Installing from $REQ"
+            pip install -r "$REQ"
+          else
+            echo "No requirements.txt found; installing common deps"
             pip install pyinstaller pynacl mnemonic cryptography rich base58
-          }
+          fi
 
       - name: Ensure PyInstaller
-        shell: pwsh
-        run: |
-          pip install --upgrade pyinstaller
+        run: pip install --upgrade pyinstaller
 
-      - name: Build EXE with PyInstaller (robust)
-        shell: pwsh
+      - name: Build executable with PyInstaller
+        shell: bash
         run: |
-          # Ensure we are in the repo root
-          Set-Location -Path $env:GITHUB_WORKSPACE
-          Write-Host "Building from: $(Get-Location)"
-          Write-Host "Repo files:"
-          Get-ChildItem -Force
+          cd "$GITHUB_WORKSPACE"
+          echo "Building from: $(pwd)"
+          ls -la
 
-          if (-Not (Test-Path ".\vanity.py")) {
-            Write-Host "ERROR: vanity.py not found in repository root; aborting build."
+          if [ ! -f "vanity.py" ]; then
+            echo "ERROR: vanity.py not found in repository root; aborting build."
             exit 1
-          }
+          fi
 
-          # Build dynamic --add-data args only for folders that exist
-          $addDataArgs = @()
-          $candidates = @("config","vane","dependency-installs")
-          foreach ($c in $candidates) {
-            if (Test-Path $c) {
-              $arg = "$env:GITHUB_WORKSPACE\$c;$c"
-              Write-Host "Including data: $arg"
-              $addDataArgs += "--add-data"
-              $addDataArgs += $arg
-            } else {
-              Write-Host "Skipping missing: $c"
-            }
-          }
+          ADDDATA=""
+          for c in config vane dependency-installs; do
+            if [ -d "$c" ]; then
+              echo "Including data: $c"
+              ADDDATA="$ADDDATA --add-data $GITHUB_WORKSPACE/$c:$c"
+            else
+              echo "Skipping missing: $c"
+            fi
+          done
 
-          $pyArgs = @("--onefile","--console") + $addDataArgs + @("$env:GITHUB_WORKSPACE\vanity.py")
-          Write-Host "pyinstaller $($pyArgs -join ' ')"
-          pyinstaller @pyArgs
+          pyinstaller --onefile --console $ADDDATA vanity.py
 
-      - name: Show dist contents (debug)
-        shell: pwsh
+      - name: Package artifact
+        shell: bash
         run: |
-          Set-Location -Path $env:GITHUB_WORKSPACE
-          if (Test-Path ".\dist\vanity.exe") {
-            Write-Host "dist contents:"
-            Get-ChildItem -LiteralPath ".\dist" -Force
-          } else {
-            Write-Host "No dist\\vanity.exe found — inspect previous logs for PyInstaller errors."
-            if (Test-Path ".\dist") { Get-ChildItem -LiteralPath ".\dist" -Recurse -Force }
-            exit 1
-          }
+          cd dist
+          # Pick the correct filename depending on OS
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            OUTFILE="vanity-windows.exe"
+            zip ../$OUTFILE.zip vanity.exe
+          elif [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            OUTFILE="vanity-linux"
+            mv vanity $OUTFILE
+            zip ../$OUTFILE.zip $OUTFILE
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            OUTFILE="vanity-macos"
+            mv vanity $OUTFILE
+            zip ../$OUTFILE.zip $OUTFILE
+          fi
+          cd ..
 
-      - name: Zip executable
-        shell: pwsh
-        run: |
-          if (Test-Path ".\vanity.zip") { Remove-Item ".\vanity.zip" -Force }
-          Compress-Archive -Path ".\dist\vanity.exe" -DestinationPath ".\vanity.zip"
-          Write-Host "Created vanity.zip"
-
-      - name: Upload artifact (downloadable from Actions UI)
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: vanity-windows-exe
-          path: vanity.zip
+          name: vanity-${{ matrix.os }}
+          path: vanity-*.zip
