@@ -8,32 +8,41 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
+      - name: Install dependencies (from dependency-installs/requirements.txt if present)
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          if (Test-Path requirements.txt) {
-            pip install -r requirements.txt
+          if (Test-Path "dependency-installs/requirements.txt") {
+            Write-Host "Installing from dependency-installs/requirements.txt"
+            pip install -r "dependency-installs/requirements.txt"
+          } else {
+            Write-Host "No requirements file found at dependency-installs/requirements.txt — installing common deps"
+            pip install pyinstaller pynacl mnemonic cryptography rich base58
           }
-          # manually install known deps
-          pip install pyinstaller pynacl mnemonic cryptography rich base58
+
+      - name: Ensure PyInstaller is installed
+        shell: pwsh
+        run: |
+          pip install --upgrade pyinstaller
 
       - name: Build EXE with PyInstaller
+        shell: pwsh
         run: |
+          # adjust --add-data entries as needed for your project (format: "src;dest" on Windows)
           pyinstaller --onefile --console `
             --add-data "config;config" `
             vanity.py
 
-      - name: Upload artifact
+      - name: Upload built EXE artifact
         uses: actions/upload-artifact@v4
         with:
           name: vanity-windows-exe
