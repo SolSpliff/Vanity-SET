@@ -18,7 +18,7 @@ jobs:
           path: vanity
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
@@ -26,7 +26,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          REQ="$GITHUB_WORKSPACE/dependency-installs/requirements.txt"
+          REQ="$GITHUB_WORKSPACE/vanity/dependency-installs/requirements.txt"
           if [ -f "$REQ" ]; then
             echo "Installing from $REQ"
             pip install -r "$REQ"
@@ -54,7 +54,7 @@ jobs:
           for c in config vane dependency-installs; do
             if [ -d "$c" ]; then
               echo "Including data: $c"
-              ADDDATA="$ADDDATA --add-data $GITHUB_WORKSPACE/$c:$c"
+              ADDDATA="$ADDDATA --add-data $(pwd)/$c:$c"
             else
               echo "Skipping missing: $c"
             fi
@@ -65,7 +65,7 @@ jobs:
       - name: Package artifact
         shell: bash
         run: |
-          cd dist
+          cd vanity/dist
           # Pick the correct filename depending on OS
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             OUTFILE="vanity-windows.exe"
@@ -79,10 +79,10 @@ jobs:
             mv vanity $OUTFILE
             zip ../$OUTFILE.zip $OUTFILE
           fi
-          cd ..
+          cd ../..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: vanity-${{ matrix.os }}
-          path: vanity-*.zip
+          path: vanity/*.zip
