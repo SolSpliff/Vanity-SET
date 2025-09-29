@@ -1,23 +1,40 @@
-name: Build Windows .exe (PyInstaller)
+name: Build Vanity EXE (Windows)
+
 on:
-  release:
-    types: [created]
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pyinstaller==5.13.0
-      - run: |
-          pyinstaller --onefile --add-data "regexes.json;." --add-data "chains;chains" --name vanity-generator vanity.py
-      - uses: softprops/action-gh-release@v1
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          if (Test-Path requirements.txt) {
+            pip install -r requirements.txt
+          }
+          # manually install known deps
+          pip install pyinstaller pynacl mnemonic cryptography rich base58
+
+      - name: Build EXE with PyInstaller
+        run: |
+          pyinstaller --onefile --console `
+            --add-data "config;config" `
+            vanity.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: dist/vanity-generator.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: vanity-windows-exe
+          path: dist/vanity.exe
