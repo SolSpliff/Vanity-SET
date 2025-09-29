@@ -4,5 +4,6 @@
   "^jetton": "Jetton",
   "^stton": "stTON",
   "^telegram": "Telegram",
-  "^openledger": "OpenLedger"
+  "^openledger": "OpenLedger",
+  "^tCat": "tCat"
 }
