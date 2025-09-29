@@ -17,10 +17,12 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
-          Write-Host "PWD:"
+          Write-Host "Current user:"
+          whoami
+          Write-Host "PWD before cd:"
           pwd
-          Write-Host "Listing workspace root:"
-          Get-ChildItem -Force -LiteralPath $env:GITHUB_WORKSPACE
+          Write-Host "Top-level files/dirs:"
+          Get-ChildItem -LiteralPath $env:GITHUB_WORKSPACE -Force | Format-Table -AutoSize
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -31,11 +33,12 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          if (Test-Path "$env:GITHUB_WORKSPACE\dependency-installs\requirements.txt") {
-            Write-Host "Installing from dependency-installs/requirements.txt"
-            pip install -r "$env:GITHUB_WORKSPACE\dependency-installs\requirements.txt"
+          $reqPath = Join-Path $env:GITHUB_WORKSPACE "dependency-installs\\requirements.txt"
+          if (Test-Path $reqPath) {
+            Write-Host "Installing from $reqPath"
+            pip install -r $reqPath
           } else {
-            Write-Host "No requirements file found at dependency-installs/requirements.txt — installing common deps"
+            Write-Host "No dependency-installs/requirements.txt found; installing common deps"
             pip install pyinstaller pynacl mnemonic cryptography rich base58
           }
 
@@ -44,20 +47,45 @@ jobs:
         run: |
           pip install --upgrade pyinstaller
 
-      - name: Build EXE with PyInstaller
+      - name: Build EXE with PyInstaller (robust)
         shell: pwsh
-        # Ensure we run inside the checked-out repo (GITHUB_WORKSPACE); list files to debug.
         run: |
+          # Force the working directory to the checked-out repo
           Set-Location -Path $env:GITHUB_WORKSPACE
-          Write-Host "Current directory: $(Get-Location)"
-          Write-Host "Repo files (root):"
-          Get-ChildItem -Force -LiteralPath $env:GITHUB_WORKSPACE
+          Write-Host "Building from: $(Get-Location)"
+          Write-Host "Repo root listing:"
+          Get-ChildItem -Force
 
-          # Adjust --add-data entries as needed. On Windows the separator is ';'
-          # If 'config' or 'vane' are not present, remove those lines or adjust paths.
-          pyinstaller --onefile --console `
-            --add-data "$env:GITHUB_WORKSPACE\config;config" `
-            "$env:GITHUB_WORKSPACE\vanity.py"
+          # Build a list of add-data args only for directories that exist
+          $addDataArgs = @()
+          $candidates = @(
+            @{src="config"; dest="config"},
+            @{src="vane"; dest="vane"},
+            @{src="dependency-installs"; dest="dependency-installs"}
+          )
+          foreach ($c in $candidates) {
+            $srcPath = Join-Path $env:GITHUB_WORKSPACE $c.src
+            if (Test-Path $srcPath) {
+              # PyInstaller on Windows expects "src;dest"
+              $arg = "$srcPath;$($c.dest)"
+              Write-Host "Including data: $arg"
+              $addDataArgs += "--add-data"
+              $addDataArgs += $arg
+            } else {
+              Write-Host "Not including missing path: $srcPath"
+            }
+          }
+
+          # Compose PyInstaller command
+          $pyinstallerArgs = @("--onefile","--console")
+          $pyinstallerArgs += $addDataArgs
+          $pyinstallerArgs += "$env:GITHUB_WORKSPACE\vanity.py"
+
+          Write-Host "Running PyInstaller with args:"
+          Write-Host ($pyinstallerArgs -join " ")
+
+          # Run PyInstaller (pipe output live)
+          pyinstaller @pyinstallerArgs
 
       - name: Show dist contents (debug)
         shell: pwsh
@@ -65,9 +93,9 @@ jobs:
           Set-Location -Path $env:GITHUB_WORKSPACE
           if (Test-Path ".\dist") {
             Write-Host "dist contents:"
-            Get-ChildItem -Force -LiteralPath ".\dist"
+            Get-ChildItem -LiteralPath ".\dist" -Force
           } else {
-            Write-Host "No dist directory produced."
+            Write-Host "No dist directory produced. Check build logs above."
           }
 
       - name: Upload built EXE artifact
