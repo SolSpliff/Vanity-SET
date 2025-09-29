@@ -15,6 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
+          repository: ${{ github.repository }}
           path: vanity
 
       - name: Set up Python 3.11
