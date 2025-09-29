@@ -10,16 +10,19 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout repository into workspace (safe)
         uses: actions/checkout@v4
+        with:
+          # Force checkout into the runner workspace root (avoid repo-name path issues)
+          path: '.'
+          clean: true
+          fetch-depth: 0
 
       - name: Show workspace info (debug)
         shell: pwsh
         run: |
           Write-Host "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
-          Write-Host "Current user:"
-          whoami
-          Write-Host "PWD before cd:"
+          Write-Host "Current directory (pwd):"
           pwd
           Write-Host "Top-level files/dirs:"
           Get-ChildItem -LiteralPath $env:GITHUB_WORKSPACE -Force | Format-Table -AutoSize
@@ -50,13 +53,18 @@ jobs:
       - name: Build EXE with PyInstaller (robust)
         shell: pwsh
         run: |
-          # Force the working directory to the checked-out repo
+          # Ensure we are inside the checked-out repo
           Set-Location -Path $env:GITHUB_WORKSPACE
           Write-Host "Building from: $(Get-Location)"
           Write-Host "Repo root listing:"
           Get-ChildItem -Force
 
-          # Build a list of add-data args only for directories that exist
+          if (-Not (Test-Path ".\vanity.py")) {
+            Write-Host "ERROR: vanity.py not found in repository root; aborting build."
+            exit 1
+          }
+
+          # Build list of --add-data args only for paths that exist
           $addDataArgs = @()
           $candidates = @(
             @{src="config"; dest="config"},
@@ -64,19 +72,16 @@ jobs:
             @{src="dependency-installs"; dest="dependency-installs"}
           )
           foreach ($c in $candidates) {
-            $srcPath = Join-Path $env:GITHUB_WORKSPACE $c.src
-            if (Test-Path $srcPath) {
-              # PyInstaller on Windows expects "src;dest"
-              $arg = "$srcPath;$($c.dest)"
+            if (Test-Path $c.src) {
+              $arg = "$env:GITHUB_WORKSPACE\$($c.src);$($c.dest)"
               Write-Host "Including data: $arg"
               $addDataArgs += "--add-data"
               $addDataArgs += $arg
             } else {
-              Write-Host "Not including missing path: $srcPath"
+              Write-Host "Skipping missing path: $($c.src)"
             }
           }
 
-          # Compose PyInstaller command
           $pyinstallerArgs = @("--onefile","--console")
           $pyinstallerArgs += $addDataArgs
           $pyinstallerArgs += "$env:GITHUB_WORKSPACE\vanity.py"
@@ -84,18 +89,19 @@ jobs:
           Write-Host "Running PyInstaller with args:"
           Write-Host ($pyinstallerArgs -join " ")
 
-          # Run PyInstaller (pipe output live)
           pyinstaller @pyinstallerArgs
 
       - name: Show dist contents (debug)
         shell: pwsh
         run: |
           Set-Location -Path $env:GITHUB_WORKSPACE
-          if (Test-Path ".\dist") {
+          if (Test-Path ".\dist\vanity.exe") {
             Write-Host "dist contents:"
             Get-ChildItem -LiteralPath ".\dist" -Force
           } else {
-            Write-Host "No dist directory produced. Check build logs above."
+            Write-Host "No dist/vanity.exe produced. See previous logs for errors."
+            if (Test-Path ".\dist") { Get-ChildItem -LiteralPath ".\dist" -Recurse -Force }
+            exit 1
           }
 
       - name: Upload built EXE artifact
