@@ -1,0 +1,7 @@
+{
+  "^sol(ana)?": "Solana",
+  "^raydium": "Raydium",
+  "^orca": "Orca",
+  "^jup(1|i)ter": "Jupiter",
+  "^bonk": "Bonk"
+}

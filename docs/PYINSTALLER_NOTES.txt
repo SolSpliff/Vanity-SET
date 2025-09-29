@@ -1,0 +1,2 @@
+If the built executable fails due to missing dynamic imports, adjust the 'hiddenimports' in pyinstaller.spec
+or create a hooks file for problematic packages (e.g., cryptography, pynacl, tonsdk).

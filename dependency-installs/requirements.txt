@@ -1,0 +1,9 @@
+rich
+mnemonic
+pynacl
+base58
+cryptography
+tonsdk
+eth-account
+web3
+pwinput

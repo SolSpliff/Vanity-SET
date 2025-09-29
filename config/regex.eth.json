@@ -1,0 +1,9 @@
+{
+  "^0xeth(ereum)?": "Ethereum",
+  "w?eth": "WETH",
+  "uniswap": "Uniswap",
+  "sushiswap": "SushiSwap",
+  "aave": "Aave",
+  "curve": "Curve",
+  "lido": "Lido"
+}

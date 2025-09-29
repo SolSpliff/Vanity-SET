@@ -1,0 +1,8 @@
+{
+  "^ton$": "TON",
+  "^toncoin": "Toncoin",
+  "^jetton": "Jetton",
+  "^stton": "stTON",
+  "^telegram": "Telegram",
+  "^openledger": "OpenLedger"
+}
