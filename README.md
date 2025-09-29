@@ -1,6 +1,6 @@
 # Vanity S.E.T.  
 _Vanity Address Generator for Solana, Ethereum, and Ton_
-
+ 
 ---
 
 ## 📖 Overview
