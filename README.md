@@ -5,7 +5,7 @@ _Vanity Address Generator for Solana, Ethereum, and Ton_
 
 ## 📖 Overview
 
-**Vanity S.E.T.** (Sol, Eth, Ton) is a multi-chain vanity address generator written in Python.  
+**Vanity S.E.T.** (Sol, Eth, Ton) is a multi-chain vanity address generator written in Python by Randy420.  
 It allows you to generate wallet addresses that **match custom regex patterns** you define.  
 The tool is designed for speed, flexibility, and configurability, with support for **shared regex rules** as well as **chain-specific regex rules**.
 
@@ -26,7 +26,6 @@ Supported blockchains:
 - Secure passphrase input (masked with `*`).
 - Colorized console output.
 - Auto-migrates old config formats (`regex.chain.json` → per-chain JSONs).
-- Graceful exit handling (resets console colors, cleans up locks).
 
 ---
 
@@ -59,8 +58,6 @@ If you don’t have a `requirements.txt`, here are the core dependencies:
 ```bash
 pip install mnemonic pwinput colorama rich
 ```
-
-*(Other libraries may be added as your config expands.)*
 
 ---
 
@@ -112,31 +109,29 @@ python vanity.py [OPTIONS]
 
 | Argument | Description |
 |----------|-------------|
-| `--sol`  | Enable Solana address generation. |
-| `--eth`  | Enable Ethereum address generation. |
-| `--ton`  | Enable Ton address generation. |
-| `--all`  | Run all chains simultaneously. |
+| `--chain {sol,eth,ton,all}` | Select which chain to generate for. Use `all` to run all supported chains. (Replaces deprecated `--sol`/`--eth`/`--ton` flags.) |
+| `--allchains` | Alias for `--chain all`. |
 | `--threads N` | Set number of worker threads (default from `settings.py`). |
-| `--output DIR` | Override the output directory. |
-| `--regex FILE` | Use an alternate regex config file. |
-| `--dry-run` | Test regex matching without generating keys. |
+| `--autosave N` | Autosave matches to encrypted files (1=yes, 0=no). Default from `settings.py`. |
+| `--mnemonic-words {12,24}` | Mnemonic length to generate (12 or 24). Default from `settings.py`. |
+| `--max-hits-per-label N` | Max hits to keep per label (all-time). Use 0 or negative for unlimited. Default from `settings.py`. |
+| `--decrypt [FILE|ALL]` | Decrypt `.key.encrypted` files. If provided without argument, decrypts all. |
+| `--dry-run` | Test regex matching without writing encrypted key files. |
+| `--show-index` | Show the all-time index and exit. |
+| `--verbose` | Verbose logging. |
 | `--help` | Show usage help. |
+
 
 ### Examples
 
 Run Ethereum only:
 ```bash
-python vanity.py --eth
+python vanity.py --chain eth
 ```
 
 Run all chains, 8 threads:
 ```bash
-python vanity.py --all --threads 8
-```
-
-Use a custom regex file:
-```bash
-python vanity.py --eth --regex config/my.eth.regex.json
+python vanity.py --allchains --threads 8
 ```
 
 ---
@@ -154,7 +149,7 @@ vanity-set/
 │   ├── regex.ton.json
 │   └── settings.py
 ├── dependency-installs/   # Setup/installation scripts
-├── vane/                  # Internal modules (chains, utils, etc.)
+├── chain/                  # Internal modules for the various chains
 └── README.md              # This file
 ```
 
