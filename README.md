@@ -82,8 +82,8 @@ Each file must be **valid JSON** containing a list of regex strings.
 Example (`regex.eth.json`):
 ```json
 [
-  "^0xdead.*",
-  ".*beef$"
+  "^0xdead.* ":"0xdead",
+  ".*beef$": "beef"
 ]
 ```
 
