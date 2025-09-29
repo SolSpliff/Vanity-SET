@@ -8,9 +8,19 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Show workspace info (debug)
+        shell: pwsh
+        run: |
+          Write-Host "GITHUB_WORKSPACE: $env:GITHUB_WORKSPACE"
+          Write-Host "PWD:"
+          pwd
+          Write-Host "Listing workspace root:"
+          Get-ChildItem -Force -LiteralPath $env:GITHUB_WORKSPACE
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -21,9 +31,9 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          if (Test-Path "dependency-installs/requirements.txt") {
+          if (Test-Path "$env:GITHUB_WORKSPACE\dependency-installs\requirements.txt") {
             Write-Host "Installing from dependency-installs/requirements.txt"
-            pip install -r "dependency-installs/requirements.txt"
+            pip install -r "$env:GITHUB_WORKSPACE\dependency-installs\requirements.txt"
           } else {
             Write-Host "No requirements file found at dependency-installs/requirements.txt — installing common deps"
             pip install pyinstaller pynacl mnemonic cryptography rich base58
@@ -36,11 +46,29 @@ jobs:
 
       - name: Build EXE with PyInstaller
         shell: pwsh
+        # Ensure we run inside the checked-out repo (GITHUB_WORKSPACE); list files to debug.
         run: |
-          # adjust --add-data entries as needed for your project (format: "src;dest" on Windows)
+          Set-Location -Path $env:GITHUB_WORKSPACE
+          Write-Host "Current directory: $(Get-Location)"
+          Write-Host "Repo files (root):"
+          Get-ChildItem -Force -LiteralPath $env:GITHUB_WORKSPACE
+
+          # Adjust --add-data entries as needed. On Windows the separator is ';'
+          # If 'config' or 'vane' are not present, remove those lines or adjust paths.
           pyinstaller --onefile --console `
-            --add-data "config;config" `
-            vanity.py
+            --add-data "$env:GITHUB_WORKSPACE\config;config" `
+            "$env:GITHUB_WORKSPACE\vanity.py"
+
+      - name: Show dist contents (debug)
+        shell: pwsh
+        run: |
+          Set-Location -Path $env:GITHUB_WORKSPACE
+          if (Test-Path ".\dist") {
+            Write-Host "dist contents:"
+            Get-ChildItem -Force -LiteralPath ".\dist"
+          } else {
+            Write-Host "No dist directory produced."
+          }
 
       - name: Upload built EXE artifact
         uses: actions/upload-artifact@v4
