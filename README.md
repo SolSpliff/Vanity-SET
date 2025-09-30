@@ -47,11 +47,9 @@ Supported chains:
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/Vanity-SET.git
+git clone https://github.com/SolSpliff/Vanity-SET.git
 cd Vanity-SET
 ```
-
-> Replace `YOUR_USERNAME` with the actual repository owner (e.g. `waruhachi`).
 
 ### 2. Python Version
 Use **Python 3.11+** (3.10 may work but 3.11 is what CI targets).
@@ -128,11 +126,12 @@ Per‑chain rules:
 > If your current implementation still expects just raw strings, use:
 > ```json
 > [
->   "^0xdead.*",
->   ".*beef$"
+>   "regex": "file name when found"
+>   "^0xdead.*": "dead", # regex | name
+>   ".*beef$": "beef"
 > ]
 > ```
-> Adjust according to what `vanity.py` actually parses.
+
 
 ### 2. Settings
 
@@ -142,7 +141,7 @@ THREADS = 4
 SAVE_KEYS = True
 OUTPUT_DIR = "output"
 AUTOSAVE = 1              # 1 = enabled, 0 = disabled
-MNEMONIC_WORDS = 12
+MNEMONIC_WORDS = 24       # 12|24 -> 24 is standard and more secure... use 12 at your own risk.
 MAX_HITS_PER_LABEL = 25
 VERBOSE = False
 ```
@@ -218,12 +217,10 @@ Vanity-SET/
 ├── dependency-installs/
 │   └── requirements.txt
 ├── docs/                      # Documentation (optional)
-├── output/                    # Generated (ignored if in .gitignore)
+├── vane/                      # Generated (ignored if in .gitignore)
 ├── LICENSE
 └── README.md
 ```
-
-> NOTE: Earlier versions may have used `chain/`—current workflow references `chains/`. Ensure the directory name matches in code and in PyInstaller data collection.
 
 ---
 
@@ -303,6 +300,8 @@ Part of ongoing experimentation ahead of a future SOL token concept (utility/mem
 
 Questions / ideas / contributions welcome.  
 Telegram: https://t.me/Randy4_20
+
+Special thanks to waruhachi for updating the readme && actually making the workflows... well, work.
 
 ---
 
