@@ -1,31 +1,45 @@
-# Vanity S.E.T.  
-_Vanity Address Generator for Solana, Ethereum, and Ton_
- 
+# Vanity-SET  
+_Vanity Address Generator for Solana, Ethereum, and TON_
+
+---
+
+## 🧭 Quick Navigation
+- [Overview](#-overview)
+- [Features](#-features)
+- [Installation](#%EF%B8%8F-installation)
+- [Configuration](#%EF%B8%8F-configuration)
+- [Usage](#%EF%B8%8F-usage)
+- [Project Structure](#-project-structure)
+- [Security Notes](#-security--operational-notes)
+- [Troubleshooting](#-troubleshooting)
+- [License](#-license)
+- [Credits](#-credits)
+
 ---
 
 ## 📖 Overview
 
-**Vanity S.E.T.** (Sol, Eth, Ton) is a multi-chain vanity address generator written in Python by Randy420.  
-It allows you to generate wallet addresses that **match custom regex patterns** you define.  
-The tool is designed for speed, flexibility, and configurability, with support for **shared regex rules** as well as **chain-specific regex rules**.
+**Vanity-SET** (Sol / Eth / Ton) is a high‑performance multi-chain vanity address generator written in Python by Randy420.  
+It lets you search for addresses that match **custom regular expressions** (shared across chains or chain-specific).  
+Designed for speed, modularity, and extensibility.
 
-Supported blockchains:
+Supported chains:
 - **Solana (SOL)**
-- **Ethereum (ETH)**
-- **Ton (TON)**
+- **Ethereum / EVM (ETH)**
+- **TON (TON)**
 
 ---
 
 ## ⚡ Features
 
-- Generate addresses on **multiple chains simultaneously**.
-- Match against:
-  - **Shared regex rules** (apply to all chains).
-  - **Per-chain regex rules** (unique to SOL/ETH/TON).
-- Customizable output and runtime behavior through `settings.py`.
-- Secure passphrase input (masked with `*`).
-- Colorized console output.
-- Auto-migrates old config formats (`regex.chain.json` → per-chain JSONs).
+- Simultaneous multi-chain search (`--chain all`).
+- Shared + per-chain **regex rule sets**.
+- Encrypted key storage (if enabled).
+- Automatic migration from old combined regex formats (if implemented in code).
+- Threaded processing for performance.
+- Clean, colorized terminal output (via `rich`).
+- Configurable runtime via `config/settings.py`.
+- Optional limit per label (avoid unbounded growth).
 
 ---
 
@@ -33,105 +47,157 @@ Supported blockchains:
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/YOUR_USERNAME/vanity-set.git
-cd vanity-set
+git clone https://github.com/YOUR_USERNAME/Vanity-SET.git
+cd Vanity-SET
 ```
 
-### 2. Install Python
-- **Windows:**  
-  Download Python 3.10+ from [python.org](https://www.python.org/downloads/windows/).  
-  During installation, **check "Add Python to PATH"**.
+> Replace `YOUR_USERNAME` with the actual repository owner (e.g. `waruhachi`).
 
-- **Linux/macOS:**  
-  Most systems already include Python 3. Run:
-  ```bash
-  python3 --version
-  ```
+### 2. Python Version
+Use **Python 3.11+** (3.10 may work but 3.11 is what CI targets).
+
+Check version:
+```bash
+python --version
+```
+
+If `python` maps to 2.x on Linux:
+```bash
+python3 --version
+```
 
 ### 3. Install Dependencies
-From the project root, run:
+
+If the repo ships a requirements file (recommended):
 ```bash
-pip install -r requirements.txt
+pip install -r dependency-installs/requirements.txt
 ```
 
-If you don’t have a `requirements.txt`, here are the core dependencies:
+Typical dependencies include (for reference only):
+```
+pyinstaller
+rich
+mnemonic
+pynacl
+base58
+cryptography
+tonsdk
+eth-account
+web3
+pwinput
+```
+
+(Do NOT manually install if you already used the requirements file.)
+
+### 4. (Optional) Create a Virtual Environment
 ```bash
-pip install mnemonic pwinput colorama rich
+python -m venv .venv
+source .venv/bin/activate      # Linux/macOS
+# or
+.\.venv\Scripts\activate       # Windows
+pip install -r dependency-installs/requirements.txt
 ```
 
 ---
 
 ## ⚙️ Configuration
 
-All configs are located in the [`config/`](./config) directory.
+All configuration lives under [`config/`](./config).
 
-### 1. Regex Files
-You control how addresses are matched with regex JSONs:
+### 1. Regex Rule Files
 
-- **Shared rules (all chains):**
-  - `regex.shared.json`
-- **Chain-specific rules:**
-  - `regex.sol.json`
-  - `regex.eth.json`
-  - `regex.ton.json`
+You control search logic via JSON lists of pattern objects or strings (depending on implementation).  
+Current convention (recommended): **list of objects** with explicit labels.
 
-Each file must be **valid JSON** containing a list of regex strings.  
-Example (`regex.eth.json`):
+Example (`config/regex.eth.json`):
 ```json
 [
-  "^0xdead.* ":"0xdead",
-  ".*beef$": "beef"
+  { "pattern": "^0xdead.*", "label": "dead_prefix" },
+  { "pattern": ".*beef$", "label": "beef_suffix" }
 ]
 ```
 
-> ⚠️ Make sure you use **valid JSON** — double quotes, no trailing commas.
+Shared rules (apply to all chains):
+- `regex.shared.json`
+
+Per‑chain rules:
+- `regex.sol.json`
+- `regex.eth.json`
+- `regex.ton.json`
+
+> If your current implementation still expects just raw strings, use:
+> ```json
+> [
+>   "^0xdead.*",
+>   ".*beef$"
+> ]
+> ```
+> Adjust according to what `vanity.py` actually parses.
 
 ### 2. Settings
-Edit [`config/settings.py`](./config/settings.py) to tweak runtime options:
+
+Edit [`config/settings.py`](./config/settings.py). Example (illustrative only):
 ```python
-# Example settings.py
 THREADS = 4
 SAVE_KEYS = True
 OUTPUT_DIR = "output"
+AUTOSAVE = 1              # 1 = enabled, 0 = disabled
+MNEMONIC_WORDS = 12
+MAX_HITS_PER_LABEL = 25
+VERBOSE = False
 ```
+
+### 3. Encryption / Key Handling
+
+If the tool encrypts found keys (e.g., using a passphrase prompt), ensure:
+- You use a **strong passphrase** (length > 12, mix of classes).
+- You store decrypted keys securely and never commit them.
 
 ---
 
 ## ▶️ Usage
 
-Run the program from the project root:
-
+From repository root:
 ```bash
 python vanity.py [OPTIONS]
 ```
 
-### Arguments & Options
+### Core Options
 
-| Argument | Description |
-|----------|-------------|
-| `--chain {sol,eth,ton,all}` | Select which chain to generate for. Use `all` to run all supported chains. (Replaces deprecated `--sol`/`--eth`/`--ton` flags.) |
+| Option | Description |
+|--------|-------------|
+| `--chain {sol,eth,ton,all}` | Target a single chain or all simultaneously. |
 | `--allchains` | Alias for `--chain all`. |
-| `--threads N` | Set number of worker threads (default from `settings.py`). |
-| `--autosave N` | Autosave matches to encrypted files (1=yes, 0=no). Default from `settings.py`. |
-| `--mnemonic-words {12,24}` | Mnemonic length to generate (12 or 24). Default from `settings.py`. |
-| `--max-hits-per-label N` | Max hits to keep per label (all-time). Use 0 or negative for unlimited. Default from `settings.py`. |
-| `--decrypt [FILE|ALL]` | Decrypt `.key.encrypted` files. If provided without argument, decrypts all. |
-| `--dry-run` | Test regex matching without writing encrypted key files. |
-| `--show-index` | Show the all-time index and exit. |
+| `--threads N` | Override default thread count. |
+| `--autosave {0,1}` | Enable/disable automatic encrypted saving. |
+| `--mnemonic-words {12,24}` | Mnemonic length (if supported). |
+| `--max-hits-per-label N` | Cap saved hits per label (0 or negative = unlimited). |
+| `--decrypt [FILE|ALL]` | Decrypt saved encrypted key files. |
+| `--dry-run` | Test matching without saving. |
+| `--show-index` | Show metadata / hit index then exit. |
 | `--verbose` | Verbose logging. |
-| `--help` | Show usage help. |
-
+| `--help` | Show help text. |
 
 ### Examples
 
-Run Ethereum only:
+Generate only Ethereum:
 ```bash
 python vanity.py --chain eth
 ```
 
-Run all chains, 8 threads:
+All chains, 8 threads:
 ```bash
-python vanity.py --allchains --threads 8
+python vanity.py --chain all --threads 8
+```
+
+Dry run shared + per-chain patterns (no saves):
+```bash
+python vanity.py --chain all --dry-run
+```
+
+Decrypt everything:
+```bash
+python vanity.py --decrypt
 ```
 
 ---
@@ -139,42 +205,130 @@ python vanity.py --allchains --threads 8
 ## 📂 Project Structure
 
 ```
-vanity-set/
-│
-├── vanity.py              # Main entrypoint
-├── config/                # Configuration files
+Vanity-SET/
+├── vanity.py                  # Main entrypoint
+├── __init__.py
+├── config/
 │   ├── regex.shared.json
 │   ├── regex.sol.json
 │   ├── regex.eth.json
 │   ├── regex.ton.json
 │   └── settings.py
-├── dependency-installs/   # Setup/installation scripts
-├── chain/                  # Internal modules for the various chains
-└── README.md              # This file
+├── chains/                    # (If implemented) Chain-specific helpers/modules
+├── dependency-installs/
+│   └── requirements.txt
+├── docs/                      # Documentation (optional)
+├── output/                    # Generated (ignored if in .gitignore)
+├── LICENSE
+└── README.md
 ```
+
+> NOTE: Earlier versions may have used `chain/`—current workflow references `chains/`. Ensure the directory name matches in code and in PyInstaller data collection.
 
 ---
 
 ## 🧪 Tips
 
-- Always run from the **project root** (same directory as `vanity.py`).
-- If you see JSON parse warnings, fix your `regex.*.json` with proper JSON syntax.
-- Use `Ctrl+C` to stop
-- Generated keys/addresses will be saved in the output directory (`output/` by default).
+- Run from repo root (same folder as `vanity.py`).
+- Keep regex JSON valid (no trailing commas, proper quotes).
+- Use fewer, more specific patterns for speed.
+- Increase `THREADS` cautiously—diminishing returns above CPU core count.
+- Use `--dry-run` to verify regex quality before long sessions.
+- Periodically back up encrypted key files.
+- If packaging with PyInstaller, update regex/config before building.
+
+---
+
+## 🛠️ Building a Standalone Binary (Optional)
+
+The project can be bundled via PyInstaller (see CI workflow for reference):
+```bash
+pip install pyinstaller
+pyinstaller --onefile vanity.py
+```
+
+To include data directories (manual example):
+```bash
+# Linux/macOS
+pyinstaller --onefile \
+  --add-data "config:config" \
+  --add-data "dependency-installs:dependency-installs" \
+  vanity.py
+
+# Windows (note the semicolons)
+pyinstaller --onefile ^
+  --add-data "config;config" ^
+  --add-data "dependency-installs;dependency-installs" ^
+  vanity.py
+```
+
+Artifacts will appear in `dist/`.
+
+---
+
+## 🔐 Security & Operational Notes
+
+- DO NOT use this on production or high-value systems without review.
+- Generated mnemonics/private keys are sensitive—treat them like real wallet seeds.
+- Avoid running on untrusted machines (e.g., shared VPS, compromised OS).
+- Always verify source integrity (Git history, commit signatures if available).
+- Consider air‑gapped generation for high-value addresses, then import offline results.
+
+---
+
+## 🧩 Troubleshooting
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| No matches after long run | Patterns too strict | Simplify regex; test with `--dry-run` |
+| PyInstaller missing files | Wrong `--add-data` syntax | Use `:` (Unix) or `;` (Windows) |
+| Slow performance | Too many threads or I/O bound | Reduce threads; profile patterns |
+| JSON decode error | Malformed regex JSON | Validate with `python -m json.tool file.json` |
+| Encrypted file won't decrypt | Wrong passphrase | Retype carefully (case-sensitive) |
 
 ---
 
 ## 📜 License
 
-MIT License — free to use, modify, and share. See [LICENSE](./LICENSE) for details.
+Released under the [MIT License](./LICENSE).  
+You are free to use, modify, and distribute with attribution.
 
 ---
 
 ## 💡 Credits
 
-Developed with ❤️ for the Web3 community.  
-Supports **Solana, Ethereum, and Ton** out of the box.
-Proof of concept work for my future SOL Token which will be dropping. Utility/Meme :)
+Created by Randy420 with ❤️ for the Web3 community.  
+Supports **Solana, Ethereum, TON** out of the box.  
+Part of ongoing experimentation ahead of a future SOL token concept (utility/meme).
 
-hit me up on telegram if there are any questions, comments or suggestions... or simply put in reports/push updates.
-https://t.me/Randy4_20
+Questions / ideas / contributions welcome.  
+Telegram: https://t.me/Randy4_20
+
+---
+
+## 🙌 Contributing
+
+1. Fork the repo
+2. Create a feature branch: `git checkout -b feat/my-feature`
+3. Commit changes: `git commit -m "feat: add X"`
+4. Push: `git push origin feat/my-feature`
+5. Open a Pull Request
+
+Please lint / format if a style config is present.
+
+---
+
+## 🗺️ Roadmap (Potential Ideas)
+
+- GPU acceleration (if feasible)
+- Web UI wrapper
+- Docker container packaging
+- Pattern scoring / regex benchmarking
+- Progress metrics (hits per second per chain)
+- Structured logging / JSON output mode
+
+> Open an issue if you'd like to help on any of these.
+
+---
+
+Enjoy generating those custom prefixes & suffixes responsibly!

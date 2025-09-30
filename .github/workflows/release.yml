@@ -1,0 +1,161 @@
+name: Release Vanity-SET
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (must already exist)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build binaries
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Determine tag (workflow_dispatch fallback)
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Building for tag: $(grep '^tag=' $GITHUB_OUTPUT | cut -d= -f2)"
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          if [ -f dependency-installs/requirements.txt ]; then
+            pip install -r dependency-installs/requirements.txt
+          else
+            pip install pyinstaller rich mnemonic pynacl base58 cryptography tonsdk eth-account web3 pwinput
+          fi
+          python -c "import PyInstaller; print('PyInstaller version:', PyInstaller.__version__)"
+
+      - name: Build executable with PyInstaller
+        run: |
+          echo "Working directory: $(pwd)"
+          ls -1
+          if [ ! -f "vanity.py" ]; then
+            echo "ERROR: vanity.py not found."
+            exit 1
+          fi
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            SEP=";"
+          else
+            SEP=":"
+          fi
+          ADDDATA=()
+          for d in config dependency-installs chains; do
+            if [ -d "$d" ]; then
+              ADDDATA+=( "--add-data" "${d}${SEP}${d}" )
+            fi
+          done
+          rm -rf build dist *.spec || true
+          python -m PyInstaller --onefile --console "${ADDDATA[@]}" vanity.py
+          echo "Dist contents:"
+          ls -l dist
+
+      - name: Package artifact
+        run: |
+          cd dist
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            OUTBINARY="vanity-windows.exe"
+            mv vanity.exe "$OUTBINARY"
+            7z a "../${OUTBINARY}.zip" "$OUTBINARY" >/dev/null
+          elif [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            OUTBINARY="vanity-linux"
+            mv vanity "$OUTBINARY"
+            chmod +x "$OUTBINARY"
+            zip -q "../${OUTBINARY}.zip" "$OUTBINARY"
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            OUTBINARY="vanity-macos"
+            mv vanity "$OUTBINARY"
+            chmod +x "$OUTBINARY"
+            zip -q "../${OUTBINARY}.zip" "$OUTBINARY"
+          fi
+          cd ..
+          echo "Created zip files:"
+          ls -1 vanity-*.zip
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}
+          path: vanity-*.zip
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release (auto notes)
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Determine tag (workflow_dispatch fallback)
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Releasing tag: $(grep '^tag=' $GITHUB_OUTPUT | cut -d= -f2)"
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List downloaded artifacts
+        run: |
+          echo "Tree of artifacts:"
+          find artifacts -type f -maxdepth 4 -print
+          echo
+          echo "Expecting files matching: artifacts/**/vanity-*.zip"
+          COUNT=$(find artifacts -type f -name "vanity-*.zip" | wc -l)
+          echo "Found $COUNT candidate zip(s)."
+          if [ "$COUNT" -eq 0 ]; then
+            echo "ERROR: No artifact zips found. Failing early."
+            exit 1
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "Vanity-SET ${{ steps.tag.outputs.tag }}"
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/**/vanity-*.zip
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
