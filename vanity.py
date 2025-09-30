@@ -23,6 +23,7 @@ ACTIVE_LOCKS = set()
 cfg_dir = "config"
 HELP_MODE = any(arg in ("-h", "--help") for arg in sys.argv)
 
+# Prevent random writing while looking at help.
 def print(x):
     if HELP_MODE:
         return
@@ -925,7 +926,7 @@ def maybe_write_html_snapshot_atomic(lock, recent_lines, hits_now_local, label_l
         return last_html_write_ref
 
 # ---------------------
-# Main
+# Main 
 # ---------------------
 def main():
     global MNEMONIC_WORDS, ALL_TIME_HITS

@@ -167,7 +167,7 @@ python vanity.py [OPTIONS]
 | `--allchains` | Alias for `--chain all`. |
 | `--threads N` | Override default thread count. |
 | `--autosave {0,1}` | Enable/disable automatic encrypted saving. |
-| `--mnemonic-words {12,24}` | Mnemonic length (if supported). |
+| `--mnemonic-words {12,24}` | Mnemonic length (if supported (ton wont accept 12)). |
 | `--max-hits-per-label N` | Cap saved hits per label (0 or negative = unlimited). |
 | `--decrypt [FILE|ALL]` | Decrypt saved encrypted key files. |
 | `--dry-run` | Test matching without saving. |
@@ -211,20 +211,16 @@ Vanity-SET/
 │   ├── regex.eth.json
 │   ├── regex.ton.json
 │   └── settings.py
-├── chains/                    # (If implemented) Chain-specific helpers/modules
+├── chains/                    # Chain-specific helpers/modules
 ├── dependency-installs/
 │   └── requirements.txt
 ├── docs/                      # Documentation (optional)
-<<<<<<< HEAD
 ├── vane/                      # Generated
 │   ├── dashboard.html         # Session tracker
 │   ├── kdf_salt               # Salt for encryption
 │   ├── vanity.log             # log files
 │   └── sol/eth/ton            # folders generated when you generate wallets for a chain
 │       └── encrypted wallets  # encrypted wallets & phrases
-=======
-├── vane/                      # Generated (ignored if in .gitignore)
->>>>>>> 472694a51e5ca22d5afe6a8d87ae99997bd90722
 ├── LICENSE
 └── README.md
 ```
