@@ -110,8 +110,9 @@ Current convention (recommended): **list of objects** with explicit labels.
 Example (`config/regex.eth.json`):
 ```json
 [
-  { "pattern": "^0xdead.*", "label": "dead_prefix" },
-  { "pattern": ".*beef$", "label": "beef_suffix" }
+  "Regex": "file name",
+  "^0xdead.*": "0xdead",
+  ".*beef$": "beef"
 ]
 ```
 
@@ -123,10 +124,9 @@ Per‑chain rules:
 - `regex.eth.json`
 - `regex.ton.json`
 
-> If your current implementation still expects just raw strings, use:
 > ```json
 > [
->   "regex": "file name when found"
+>   "regex": "file name"
 >   "^0xdead.*": "dead", # regex | name
 >   ".*beef$": "beef"
 > ]
@@ -148,9 +148,9 @@ VERBOSE = False
 
 ### 3. Encryption / Key Handling
 
-If the tool encrypts found keys (e.g., using a passphrase prompt), ensure:
+The tool encrypts found keys & phrases using a passphrase prompt... ensure:
 - You use a **strong passphrase** (length > 12, mix of classes).
-- You store decrypted keys securely and never commit them.
+- You store decrypted keys securely and NEVER share/commit them.
 
 ---
 
