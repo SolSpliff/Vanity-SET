@@ -1,0 +1,219 @@
+name: Release Vanity-SET
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release (must already exist in the repo)"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build binaries
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Determine tag (workflow_dispatch fallback)
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            # For push events, GITHUB_REF_NAME is the tag
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Building for tag: $(grep '^tag=' $GITHUB_OUTPUT | cut -d= -f2)"
+
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        run: |
+            python -m pip install --upgrade pip setuptools wheel
+            if [ -f dependency-installs/requirements.txt ]; then
+              echo "Installing from dependency-installs/requirements.txt"
+              pip install -r dependency-installs/requirements.txt
+            else
+              echo "No requirements file found; installing core deps"
+              pip install pyinstaller rich mnemonic pynacl base58 cryptography tonsdk eth-account web3 pwinput
+            fi
+            python -c "import PyInstaller, sys; print('PyInstaller version:', PyInstaller.__version__)"
+
+      - name: Build executable with PyInstaller
+        run: |
+          echo "Working directory: $(pwd)"
+          ls -1
+
+          if [ ! -f "vanity.py" ]; then
+            echo "ERROR: vanity.py not found in repository root."
+            exit 1
+          fi
+
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            SEP=";"
+          else
+            SEP=":"
+          fi
+
+          ADDDATA=()
+          for d in config dependency-installs chains; do
+            if [ -d "$d" ]; then
+              echo "Including data directory: $d"
+              ADDDATA+=( "--add-data" "${d}${SEP}${d}" )
+            else
+              echo "Skipping missing directory: $d"
+            fi
+          done
+
+          echo "Add-data args: ${ADDDATA[*]}"
+
+          rm -rf build dist *.spec || true
+          python -m PyInstaller --onefile --console "${ADDDATA[@]}" vanity.py
+
+          echo "Dist contents:"
+          ls -l dist
+
+      - name: Package artifact
+        run: |
+          cd dist
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            OUTBINARY="vanity-windows.exe"
+            mv vanity.exe "$OUTBINARY"
+          elif [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            OUTBINARY="vanity-linux"
+            mv vanity "$OUTBINARY"
+            chmod +x "$OUTBINARY"
+          elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+            OUTBINARY="vanity-macos"
+            mv vanity "$OUTBINARY"
+            chmod +x "$OUTBINARY"
+          fi
+
+          # Zip artifact
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            7z a "../${OUTBINARY}.zip" "$OUTBINARY" >/dev/null
+          else
+            zip -q "../${OUTBINARY}.zip" "$OUTBINARY"
+          fi
+
+          cd ..
+          echo "Created artifact zips:"
+          ls -1 vanity-*.zip
+
+          # Compute checksum for the zip
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            certutil -hashfile "${OUTBINARY}.zip" SHA256 | findstr /R /V "hash" | findstr /R /V ":" > "${OUTBINARY}.zip.sha256"
+            echo "  ${OUTBINARY}.zip (Windows SHA256)" 
+          else
+            shasum -a 256 "${OUTBINARY}.zip" > "${OUTBINARY}.zip.sha256"
+          fi
+          echo "Checksum file content:"
+          cat "${OUTBINARY}.zip.sha256"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}
+          path: |
+            vanity-*.zip
+            *.zip.sha256
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Determine tag (workflow_dispatch fallback)
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Releasing tag: $(grep '^tag=' $GITHUB_OUTPUT | cut -d= -f2)"
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Aggregate checksums
+        run: |
+          cd artifacts
+          echo "# SHA256 Checksums" > checksums.txt
+          echo "" >> checksums.txt
+          find . -name "*.sha256" -type f -print0 | while IFS= read -r -d '' f; do
+            # normalize format: HASH  FILENAME
+            LINE=$(cat "$f")
+            HASH=""
+            FILE=""
+            if echo "$LINE" | grep -q ' '; then
+              # typical shasum format: HASH  filename
+              HASH=$(echo "$LINE" | awk '{print $1}')
+              FILE=$(echo "$LINE" | awk '{print $2}')
+            else
+              # certutil output (already only hash) - derive filename
+              HASH="$LINE"
+              FILE="$(basename "$f" .sha256)"
+            fi
+            # Remove leading ./ if present
+            FILE=$(echo "$FILE" | sed 's|^\./||')
+            # If file not directly in root, try to guess the zip name
+            if [ ! -f "$FILE" ]; then
+              # search for the zip in subfolders
+              MATCH=$(find . -type f -name "$(basename "$FILE")" | head -n1 | sed 's|^\./||')
+              if [ -n "$MATCH" ]; then
+                FILE="$MATCH"
+              fi
+            fi
+            echo "${HASH}  ${FILE}" >> checksums.txt
+          done
+          echo ""
+          echo "Combined checksums:"
+          cat checksums.txt
+
+      - name: Prepare file list
+        id: files
+        run: |
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          find artifacts -type f \( -name "vanity-*.zip" -o -name "checksums.txt" \) | sort
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "Vanity-SET ${{ steps.tag.outputs.tag }}"
+          generate_release_notes: true
+          files: |
+            ${{ steps.files.outputs.files }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
