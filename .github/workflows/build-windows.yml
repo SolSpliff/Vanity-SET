@@ -4,6 +4,10 @@ on:
   push:
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   build:
     strategy:
@@ -14,6 +18,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+            path: src
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
@@ -21,10 +27,10 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        shell: bash
+        working-directory: src
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          REQ="$GITHUB_WORKSPACE/dependency-installs/requirements.txt"
+          REQ="dependency-installs/requirements.txt"
           if [ -f "$REQ" ]; then
             echo "Installing from $REQ"
             pip install -r "$REQ"
@@ -34,18 +40,17 @@ jobs:
           fi
 
       - name: Build executable with PyInstaller
-        shell: bash
+        working-directory: src
         run: |
-          cd "$GITHUB_WORKSPACE"
           echo "Building from: $(pwd)"
           ls -la
 
           if [ ! -f "vanity.py" ]; then
-            echo "ERROR: vanity.py not found in repository root; aborting build."
+            echo "ERROR: vanity.py not found in repo checkout folder (src)."
             exit 1
           fi
 
-            ADDDATA=""
+          ADDDATA=""
           for c in config vane dependency-installs; do
             if [ -d "$c" ]; then
               echo "Including data: $c"
@@ -58,9 +63,8 @@ jobs:
           pyinstaller --onefile --console $ADDDATA vanity.py
 
       - name: Package artifact
-        shell: bash
+        working-directory: src/dist
         run: |
-          cd dist
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             OUTFILE="vanity-windows.exe"
             zip ../$OUTFILE.zip vanity.exe
@@ -73,10 +77,9 @@ jobs:
             mv vanity $OUTFILE
             zip ../$OUTFILE.zip $OUTFILE
           fi
-          cd ..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: vanity-${{ matrix.os }}
-          path: vanity-*.zip
+          path: src/vanity-*.zip
