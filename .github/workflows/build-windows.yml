@@ -1,12 +1,8 @@
-name: Build Vanity-S.E.T.
+name: Build Vanity-SET
 
 on:
   push:
   workflow_dispatch:
-
-defaults:
-  run:
-    shell: bash
 
 jobs:
   build:
@@ -15,71 +11,95 @@ jobs:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
 
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-        with:
-            path: src
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
+          cache: pip
 
       - name: Install dependencies
-        working-directory: src
+        env:
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          REQ="dependency-installs/requirements.txt"
-          if [ -f "$REQ" ]; then
-            echo "Installing from $REQ"
-            pip install -r "$REQ"
+          if [ -f dependency-installs/requirements.txt ]; then
+            echo "Installing dependencies from dependency-installs/requirements.txt"
+            pip install -r dependency-installs/requirements.txt
           else
-            echo "No requirements.txt found; installing common deps"
-            pip install pyinstaller pynacl mnemonic cryptography rich base58
+            echo "requirements.txt missing; installing core runtime deps"
+            pip install rich mnemonic pynacl base58 cryptography tonsdk eth-account web3 pwinput pyinstaller
           fi
+          python -c "import PyInstaller, sys; print('PyInstaller version:', PyInstaller.__version__)"
 
       - name: Build executable with PyInstaller
-        working-directory: src
         run: |
           echo "Building from: $(pwd)"
-          ls -la
+          ls -1
 
           if [ ! -f "vanity.py" ]; then
-            echo "ERROR: vanity.py not found in repo checkout folder (src)."
+            echo "ERROR: vanity.py not found in repository root."
             exit 1
           fi
 
-          ADDDATA=""
-          for c in config vane dependency-installs; do
-            if [ -d "$c" ]; then
-              echo "Including data: $c"
-              ADDDATA="$ADDDATA --add-data $(pwd)/$c:$c"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            SEP=";"
+          else
+            SEP=":"
+          fi
+
+          ADDDATA=()
+            # List any data directories you want bundled:
+          for d in config dependency-installs chains; do
+            if [ -d "$d" ]; then
+              echo "Including data directory: $d"
+              ADDDATA+=( "--add-data" "${d}${SEP}${d}" )
             else
-              echo "Skipping missing: $c"
+              echo "Skipping missing directory: $d"
             fi
           done
 
-          pyinstaller --onefile --console $ADDDATA vanity.py
+          echo "Add-data args: ${ADDDATA[*]}"
+
+          rm -rf build dist *.spec || true
+
+          python -m PyInstaller --onefile --console "${ADDDATA[@]}" vanity.py
+
+          echo "Dist contents:"
+          ls -l dist
 
       - name: Package artifact
-        working-directory: src/dist
         run: |
+          cd dist
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             OUTFILE="vanity-windows.exe"
-            zip ../$OUTFILE.zip vanity.exe
+            mv vanity.exe "$OUTFILE"
+            7z a "../$OUTFILE.zip" "$OUTFILE" >/dev/null
           elif [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
             OUTFILE="vanity-linux"
-            mv vanity $OUTFILE
-            zip ../$OUTFILE.zip $OUTFILE
+            mv vanity "$OUTFILE"
+            chmod +x "$OUTFILE"
+            zip -q "../$OUTFILE.zip" "$OUTFILE"
           elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
             OUTFILE="vanity-macos"
-            mv vanity $OUTFILE
-            zip ../$OUTFILE.zip $OUTFILE
+            mv vanity "$OUTFILE"
+            chmod +x "$OUTFILE"
+            zip -q "../$OUTFILE.zip" "$OUTFILE"
           fi
+          cd ..
+          echo "Created archives:"
+          ls -1 vanity-*.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: vanity-${{ matrix.os }}
-          path: src/vanity-*.zip
+          path: vanity-*.zip
+          if-no-files-found: error
