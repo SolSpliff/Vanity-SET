@@ -215,12 +215,16 @@ Vanity-SET/
 ├── dependency-installs/
 │   └── requirements.txt
 ├── docs/                      # Documentation (optional)
+<<<<<<< HEAD
 ├── vane/                      # Generated
 │   ├── dashboard.html         # Session tracker
 │   ├── kdf_salt               # Salt for encryption
 │   ├── vanity.log             # log files
 │   └── sol/eth/ton            # folders generated when you generate wallets for a chain
 │       └── encrypted wallets  # encrypted wallets & phrases
+=======
+├── vane/                      # Generated (ignored if in .gitignore)
+>>>>>>> 472694a51e5ca22d5afe6a8d87ae99997bd90722
 ├── LICENSE
 └── README.md
 ```

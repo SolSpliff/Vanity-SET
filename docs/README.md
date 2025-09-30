@@ -221,6 +221,7 @@ Vanity-SET/
 │   ├── vanity.log             # log files
 │   └── sol/eth/ton            # folders generated when you generate wallets for a chain
 │       └── encrypted wallets  # encrypted wallets & phrases
+├── vane/                      # Generated (ignored if in .gitignore)
 ├── LICENSE
 └── README.md
 ```
