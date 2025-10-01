@@ -14,7 +14,7 @@ _Vanity Address Generator for Solana, Ethereum, and TON_
 - [Troubleshooting](#-troubleshooting)
 - [License](#-license)
 - [Credits](#-credits)
-
+ 
 ---
 
 ## 📖 Overview
@@ -169,7 +169,7 @@ python vanity.py [OPTIONS]
 | `--autosave {0,1}` | Enable/disable automatic encrypted saving. |
 | `--mnemonic-words {12,24}` | Mnemonic length (if supported (ton wont accept 12)). |
 | `--max-hits-per-label N` | Cap saved hits per label (0 or negative = unlimited). |
-| `--decrypt [FILE|ALL]` | Decrypt saved encrypted key files. |
+| `--decrypt [FILE/ALL]` | Decrypt saved encrypted key files. |
 | `--dry-run` | Test matching without saving. |
 | `--show-index` | Show metadata / hit index then exit. |
 | `--verbose` | Verbose logging. |
