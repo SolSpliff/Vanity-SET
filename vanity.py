@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from contextlib import contextmanager
 import atexit
 from typing import List, Dict
+from rich.text import Text
 
 ACTIVE_LOCKS = set()
 cfg_dir = "config"
@@ -1069,17 +1070,23 @@ def main():
     if conflicts:
         print(f"[yellow]Warning: {len(conflicts)} overlapping pattern(s) found; chain-specific labels will be used.[/yellow]")
         for p, s_lbl, c_lbl, ck in conflicts:
-            print(f"  [yellow]Overlap:[/] Pattern [magenta]{p}[/magenta] - shared label:[cyan]{s_lbl}[/cyan] -> chain({ck}) label:[cyan]{c_lbl}[/cyan]")
+            console.print("  ", Text("Overlap:", style="yellow"),
+                      " Pattern ", Text(p, style="magenta"),
+                      " - shared label:", Text(s_lbl, style="cyan"),
+                      " -> chain(", str(ck), ") label:", Text(c_lbl, style="cyan"))
+            #print(f"  [yellow]Overlap:[/] Pattern [magenta]{p}[/magenta] - shared label:[cyan]{s_lbl}[/cyan] -> chain({ck}) label:[cyan]{c_lbl}[/cyan]")
 
     if shared_only:
         print("\n[bold]Shared patterns:[/bold]")
         for p, lbl in shared_only.items():
-            print(f" • [magenta]{p}[/magenta]  →  [cyan]{lbl}[/cyan]")
+            console.print(" • ", Text(p, style="magenta"), "  →  ", Text(lbl, style="cyan"))
+            #print(f" • [magenta]{p}[/magenta]  →  [cyan]{lbl}[/cyan]")
 
     if chain_only:
         print(f"\n[bold]Chain-specific patterns ({', '.join(selected_chains)}):[/bold]")
         for p, lbl in chain_only.items():
-            print(f" • [yellow]{p}[/yellow]  →  [cyan]{lbl}[/cyan]")
+            console.print(" • ", Text(p, style="yellow"), "  →  ", Text(lbl, style="cyan"))
+            #print(f" • [yellow]{p}[/yellow]  →  [cyan]{lbl}[/cyan]")
 
     print(f"\n[bold green]Mnemonic length chosen:[/bold green] {MNEMONIC_WORDS} words\n")
     if args.dry_run:
