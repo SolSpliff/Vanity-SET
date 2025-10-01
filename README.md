@@ -14,7 +14,7 @@ _Vanity Address Generator for Solana, Ethereum, and TON_
 - [Troubleshooting](#-troubleshooting)
 - [License](#-license)
 - [Credits](#-credits)
-
+ 
 ---
 
 ## 📖 Overview

@@ -22,8 +22,8 @@ from typing import List, Dict
 ACTIVE_LOCKS = set()
 cfg_dir = "config"
 HELP_MODE = any(arg in ("-h", "--help") for arg in sys.argv)
+TOTAL_REGEX = 0
 
-# Prevent random writing while looking at help.
 def print(x):
     if HELP_MODE:
         return
@@ -271,7 +271,8 @@ def _try_autocorrect_json(text: str):
         return True, t2
     return False, text
 
-def load_patterns_from_json(path="regexes.json"):
+def load_patterns_from_json(path="regex.shared.json"):
+    global TOTAL_REGEX
     if not os.path.exists(path):
         return {}
     try:
@@ -284,17 +285,17 @@ def load_patterns_from_json(path="regexes.json"):
 
     try:
         obj = json.loads(txt)
-        if isinstance(obj, dict) and not HELP_MODE:
+        if isinstance(obj, dict):
+            TOTAL_REGEX += len(obj)
             print(f"[green]✓ Loaded {len(obj)} shared pattern(s) from {path} (valid JSON).[/green]")
             return {str(k): str(v) for k, v in obj.items()}
     except json.JSONDecodeError as jde:
-        if not HELP_MODE:
-            print(f"[yellow]Warning:[/yellow] Failed to parse {path} as JSON at line {jde.lineno} column {jde.colno}. Attempting fallbacks...")
-            logging.warning("JSON decode error in regexes.json: %s", jde)
+        print(f"[yellow]Warning:[/yellow] Failed to parse {path} as JSON at line {jde.lineno} column {jde.colno}. Attempting fallbacks...")
+        logging.warning("JSON decode error in regexes.json: %s", jde)
 
     try:
         obj = ast.literal_eval(txt)
-        if isinstance(obj, dict) and not HELP_MODE:
+        if isinstance(obj, dict):
             print(f"[green]✓ Loaded {len(obj)} shared pattern(s) from {path} [/green]")
             return {str(k): str(v) for k, v in obj.items()}
     except Exception:
@@ -304,7 +305,7 @@ def load_patterns_from_json(path="regexes.json"):
     if did_fix:
         try:
             obj = json.loads(corrected)
-            if isinstance(obj, dict) and not HELP_MODE:
+            if isinstance(obj, dict):
                 bak = path + ".bak"
                 try:
                     shutil.copy2(path, bak)
@@ -332,16 +333,16 @@ def load_patterns_from_json(path="regexes.json"):
                 parsed[p] = lbl
         else:
             parsed[ln] = "default"
-    if parsed and not HELP_MODE:
+    if parsed:
+        TOTAL_REGEX += len(parsed)
         print(f"[green]✓ Loaded {len(parsed)} shared pattern(s) from {path} using line-based fallback.[/green]")
         return {str(k): str(v) for k, v in parsed.items()}
 
-    if not HELP_MODE:
-        print(f"[red]✗ Could not parse shared pattern(s) from {path}. No patterns loaded.[/red]")
-        print("Expected formats (examples):")
-        print('- JSON:  {"^abc": "label_a", "xyz$": "label_b"}')
-        print("- Python dict (single quotes ok): {'^abc': 'label_a'}")
-        print("- Plain lines: ^abc,label_a (or just '^abc' -> default)")
+    print(f"[red]✗ Could not parse shared pattern(s) from {path}. No patterns loaded.[/red]")
+    print("Expected formats (examples):")
+    print('- JSON:  {"^abc": "label_a", "xyz$": "label_b"}')
+    print("- Python dict (single quotes ok): {'^abc': 'label_a'}")
+    print("- Plain lines: ^abc,label_a (or just '^abc' -> default)")
 
     return {}
 
@@ -355,13 +356,14 @@ for sp in (os.path.join("config","regex.shared.json"), os.path.join("config","re
     try:
         if os.path.exists(sp):
             sp_loaded = load_patterns_from_json(sp)
-            if sp_loaded and not HELP_MODE:
+            if sp_loaded:
                 SHARED_PATTERNS = sp_loaded
+                TOTAL_REGEX += len(SHARED_PATTERNS)
                 print(f"[green]✓ Loaded {len(SHARED_PATTERNS)} shared pattern(s) from {sp}[/green]")
                 break
     except Exception as e:
         logging.exception(f"Failed loading shared shared pattern(s) from {sp}: {e}")
-if not SHARED_PATTERNS and not HELP_MODE:
+if not SHARED_PATTERNS:
     print("[yellow]Notice:[/yellow] No shared patterns found in config/regex.shared.json or regexes.json.")
 
 # Per-chain patterns are read from config/regex.<chain>.json files (e.g. regex.sol.json)
@@ -926,7 +928,7 @@ def maybe_write_html_snapshot_atomic(lock, recent_lines, hits_now_local, label_l
         return last_html_write_ref
 
 # ---------------------
-# Main 
+# Main
 # ---------------------
 def main():
     global MNEMONIC_WORDS, ALL_TIME_HITS
@@ -1050,6 +1052,18 @@ def main():
 
     combined = dict(shared_only)
     combined.update(chain_only)
+
+    # Ensure global PATTERNS and compiled_patterns reflect the merged set
+    try:
+        PATTERNS.clear()
+        PATTERNS.update(combined)
+        compiled_patterns.clear()
+        compiled_patterns.update({re.compile(p, re.IGNORECASE): name for p, name in PATTERNS.items()})
+    except Exception:
+        # If PATTERNS/compiled_patterns not yet defined, avoid crashing
+        pass
+
+
 
     print(f"\n[bold green]Loaded {len(combined)} pattern(s) (shared + selected chain(s): {', '.join(selected_chains)})[/bold green]")
     if conflicts:
