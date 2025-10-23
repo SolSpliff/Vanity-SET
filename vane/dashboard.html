@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Vanity Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      --bg-dark: #0b1220;
+      --panel-dark: #0f172a;
+      --text-light: #e6eef8;
+      --muted: #98a0b4;
+    }
+    body[data-theme='dark'] {
+      background: var(--bg-dark);
+      color: var(--text-light);
+    }
+    body[data-theme='light'] {
+      background: #f9fafb;
+      color: #0b1220;
+    }
+    .header{padding:10px;border-radius:8px;margin-bottom:10px; background: var(--panel-dark); color:var(--text-light)}
+    .controls{float:right}
+    .spark{font-family:monospace;letter-spacing:1px;font-size:16px}
+    .copy-btn{background:none;border:none;padding:0;margin:0;cursor:pointer;font-weight:700;color:inherit}
+    .addr{font-family:monospace;word-break:break-all}
+    .recent {margin-top:12px}
+    table {width:100%;border-collapse:collapse;margin-bottom:8px}
+    th,td {padding:6px 8px;border-bottom:1px solid rgba(255,255,255,0.04)}
+    body[data-theme='light'] th, body[data-theme='light'] td {border-bottom:1px solid #eee}
+    .small {color:var(--muted);font-size:0.9em}
+    .theme-toggle {cursor:pointer;padding:4px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:inherit}
+  </style>
+  <script>
+    // Auto-reload small differences: if page visible, poll for changes every 1s and reload if timestamp changed
+    let lastUpdated = "2025-10-23T17:28:21.577883+00:00";
+    async function pollReload() {
+      try {
+        let r = await fetch(location.href, {cache: "no-store"});
+        if (!r.ok) return;
+        let txt = await r.text();
+        // crude parse: look for 'Updated: ' line; fallback to full reload every 10s
+        let m = txt.match(/Updated:\s*([^<\n\r]+)/);
+        if (m && m[1] && m[1] !== lastUpdated) {
+          lastUpdated = m[1];
+          location.reload();
+        }
+      } catch(e) { /* ignore */ }
+    }
+    // Toggle theme
+    function toggleTheme() {
+      const cur = document.body.getAttribute('data-theme') || 'dark';
+      const nxt = cur === 'dark' ? 'light' : 'dark';
+      document.body.setAttribute('data-theme', nxt);
+      localStorage.setItem('vanity_theme', nxt);
+    }
+    function copyText(txt) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(()=>{/* ok */}, ()=>{ fallbackCopy(txt); });
+      } else { fallbackCopy(txt); }
+    }
+    function fallbackCopy(txt) {
+      const ta = document.createElement('textarea');
+      ta.value = txt;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch(e){ }
+      ta.remove();
+      alert('Copied to clipboard:\n' + txt);
+    }
+    window.addEventListener('load', ()=> {
+      const saved = localStorage.getItem('vanity_theme') || 'dark';
+      document.body.setAttribute('data-theme', saved);
+      // poll only when visible
+      setInterval(()=> { if (!document.hidden) pollReload(); }, 1000);
+    });
+  </script>
+</head>
+<body>
+  <div class="header">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <strong style="font-size:1.05em">Patterns: 8 | Threads: 2 | Autosave: 1 | Processed: 9039</strong>
+        <div class="small" style="margin-top:6px">                    ▂▃█▃▂▃▃▂▃▄ &nbsp; <span style="margin-left:8px">Updated: 2025-10-23T17:28:21.577883+00:00</span></div>
+      </div>
+      <div class="controls">
+        <button class="theme-toggle" onclick="toggleTheme()">☀️/🌙</button>
+      </div>
+    </div>
+  </div>
+
+  <h3>Tally</h3>
+  <table>
+    <thead><tr><th>Label</th><th style="text-align:right">Session</th><th style="text-align:right">All-time</th><th style="text-align:right">Last seen</th></tr></thead>
+    <tbody>
+      
+    </tbody>
+  </table>
+
+  <div class="recent">
+    <h3>Recent matches (click label/star to copy address)</h3>
+    
+  </div>
+</body>
+</html>
